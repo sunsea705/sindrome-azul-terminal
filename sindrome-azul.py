@@ -19,36 +19,88 @@ class Personagem:
     
     def __post_init__(self):
         self.pm_atual = self.pm_max #automaticamente seta o pm atual como o valor do pm máximo na instanciação
-  
-def movimentar_personagem(linha, coluna):
-    if (linha < 0 or linha > 2 or coluna < 0 or coluna > 2):
-        print("Opção inválida para linha e/ou coluna! [Apenas 0-2]")
-        return False
-    elif (linha == jogador1.posicao_atual_linha and coluna == jogador1.posicao_atual_coluna):
-        print("Mas você já está nessa posição...")
-        return False
-    else:
-        linhaOriginal = jogador1.posicao_atual_linha
-        colunaOriginal = jogador1.posicao_atual_coluna
-        tabuleiroJogador[linhaOriginal][colunaOriginal] = '□'
-        tabuleiroJogador[linha][coluna] = jogador1.nome_abr
-        jogador1.posicao_atual_linha = linha
-        jogador1.posicao_atual_coluna = coluna
-        print(jogador1.nome + " se moveu!")
-        return True
 
-def movimentar_adversario():
-    linha, coluna = random.randint(0, 2), random.randint(0, 2)
-    while linha == adversario1.posicao_atual_linha and coluna == adversario1.posicao_atual_coluna:
-        linha, coluna = random.randint(0, 2), random.randint(0, 2)
+# Carregando atributos iniciais dos jogadores
+jogador1 = Personagem(
+    nome = "Catarina",
+    nome_abr = "J1",
+    afi = "J",
+    posicao_atual_linha = 0,
+    posicao_atual_coluna = 0,
+    pm_max = 54,
+    tec = 10,
+    det = 2,
+    rec = 7
+)
         
-    linhaOriginal = adversario1.posicao_atual_linha
-    colunaOriginal = adversario1.posicao_atual_coluna
-    tabuleiroAdversario[linhaOriginal][colunaOriginal] = '□'
-    tabuleiroAdversario[linha][coluna] = adversario1.nome_abr
-    adversario1.posicao_atual_linha = linha
-    adversario1.posicao_atual_coluna = coluna
-    print(adversario1.nome + " se moveu!")
+adversario1 = Personagem(
+    nome = "Aniratac",
+    nome_abr = "A1",
+    afi = "A",
+    posicao_atual_linha = 1,
+    posicao_atual_coluna = 1,
+    pm_max = 45,
+    tec = 14,
+    det = 5,
+    rec = 1
+)
+
+adversario2 = Personagem(
+    nome = "Haras",
+    nome_abr = "A2",
+    afi = "A",
+    posicao_atual_linha = 0,
+    posicao_atual_coluna = 0,
+    pm_max = 45,
+    tec = 14,
+    det = 5,
+    rec = 3
+)
+
+adversario3 = Personagem(
+    nome = "Anilorac",
+    nome_abr = "A3",
+    afi = "A",
+    posicao_atual_linha = 2,
+    posicao_atual_coluna = 2,
+    pm_max = 45,
+    tec = 14,
+    det = 5,
+    rec = 4
+)
+
+jogadores = [jogador1]
+adversarios = [adversario1, adversario2, adversario3]
+
+def movimentar_personagem(personagem, linha = None, coluna = None):
+    personagem_jogador = personagem.afi == 'J'
+    tabuleiro_selecionado = tabuleiro_jogador if personagem_jogador else tabuleiro_adversario
+    
+    if not personagem_jogador: #gera aleatoriamente para adversários
+        posicoes_vazias = []
+        for i, linha_selecionada in enumerate(tabuleiro_adversario):
+            for j, coluna_selecionada in enumerate(linha_selecionada):
+                if coluna_selecionada == '□':
+                    posicoes_vazias.append((i, j))
+        linha, coluna = random.choice(posicoes_vazias)
+    else: #verifica se o informado pelo jogador é válido
+        if (linha < 0 or linha > 2 or coluna < 0 or coluna > 2):
+            if personagem_jogador:
+                print("Opção inválida para linha e/ou coluna! [Apenas 0-2]")
+            return False
+        elif (linha == personagem.posicao_atual_linha and coluna == personagem.posicao_atual_coluna):
+            if personagem_jogador:
+                print("Mas você já está nessa posição...")
+            return False
+  
+    linha_original = personagem.posicao_atual_linha
+    coluna_original = personagem.posicao_atual_coluna
+    tabuleiro_selecionado[linha_original][coluna_original] = '□'
+    tabuleiro_selecionado[linha][coluna] = personagem.nome_abr
+    personagem.posicao_atual_linha = linha
+    personagem.posicao_atual_coluna = coluna
+    print(personagem.nome + " se moveu!")
+    return True
 
 def tocar_partitura(atacante, alvo):
     dano = max(atacante.tec - alvo.det, 0) #+ futuros outros modificadores
@@ -87,45 +139,22 @@ def exibir_tabuleiro():
     print(f"{jogador1.nome}'s BAND\t\t{adversario1.nome}'s BAND") 
 
     for i in range(3):
-        linhaTabuleiro = " ".join(tabuleiroJogador[i])
-        linhaAdversário = " ".join(tabuleiroAdversario[i])
-        print(linhaTabuleiro + "\t\t\t" + linhaAdversário)
+        linha_jogador = " ".join(tabuleiro_jogador[i])
+        linha_adversario = " ".join(tabuleiro_adversario[i])
+        print(linha_jogador + "\t\t\t" + linha_adversario)
         
-    print(f"PM: {jogador1.pm_atual}/{jogador1.pm_max}\t\tPM: {adversario1.pm_atual}/{adversario1.pm_max}\n")
-    
-    
-# Carregando atributos iniciais dos jogadores
-jogador1 = Personagem(
-    nome = "Catarina",
-    nome_abr = "J1",
-    afi = "J",
-    posicao_atual_linha = 0,
-    posicao_atual_coluna = 0,
-    pm_max = 54,
-    tec = 10,
-    det = 2,
-    rec = 5
-)
-        
-adversario1 = Personagem(
-    nome = "Aniratac",
-    nome_abr = "A1",
-    afi = "A",
-    posicao_atual_linha = 1,
-    posicao_atual_coluna = 1,
-    pm_max = 45,
-    tec = 14,
-    det = 5,
-    rec = 1
-)
+    print(f"PM: {jogador1.pm_atual}/{jogador1.pm_max}")
 
 # Criando tabuleiros
-tabuleiroJogador = [["□", "□", "□"], ["□", "□", "□"], ["□", "□", "□"]]
-tabuleiroAdversario = [["□", "□", "□"], ["□", "□", "□"], ["□", "□", "□"]]
+tabuleiro_jogador = [["□", "□", "□"], ["□", "□", "□"], ["□", "□", "□"]]
+tabuleiro_adversario = [["□", "□", "□"], ["□", "□", "□"], ["□", "□", "□"]]
 
 # Inicializando tabuleiros com as posições iniciais dos jogadores
-tabuleiroJogador[jogador1.posicao_atual_linha][jogador1.posicao_atual_coluna] = jogador1.nome_abr
-tabuleiroAdversario[adversario1.posicao_atual_linha][adversario1.posicao_atual_coluna] = adversario1.nome_abr
+tabuleiro_jogador[jogador1.posicao_atual_linha][jogador1.posicao_atual_coluna] = jogador1.nome_abr
+
+tabuleiro_adversario[adversario1.posicao_atual_linha][adversario1.posicao_atual_coluna] = adversario1.nome_abr
+tabuleiro_adversario[adversario2.posicao_atual_linha][adversario2.posicao_atual_coluna] = adversario2.nome_abr
+tabuleiro_adversario[adversario3.posicao_atual_linha][adversario3.posicao_atual_coluna] = adversario3.nome_abr
 
 rodada_atual = 1
 
@@ -136,10 +165,10 @@ comando_selecionado = ""
 acoes_adversario = ['m', 't', 'd']
 
 ordem_personagens = sorted(
-    [jogador1, adversario1],
+    jogadores + adversarios,
     key=lambda personagem: personagem.rec,
     reverse=True
-) # ordena do maior valor de REC pro menor. vai fazer mais sentido quando houverem bem mais players na batalha
+)
 
 exibir_tabuleiro()
 
@@ -166,7 +195,7 @@ while True:
             while True:
                 linha = int(input('Linha: '))
                 coluna = int(input('Coluna: '))
-                if (movimentar_personagem(linha, coluna)):
+                if (movimentar_personagem(jogador1, linha, coluna)):
                     acao_realizada = True
                     break
                 
@@ -198,7 +227,7 @@ while True:
         while True:
             acao_adversario_escolhida = random.choice(acoes_adversario)
             if (acao_adversario_escolhida == 'm'):
-                movimentar_adversario()
+                movimentar_personagem(adversario1)
                 break
             elif (acao_adversario_escolhida == 't'):
                 tocar_partitura(adversario1, jogador1)
