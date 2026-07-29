@@ -30,18 +30,17 @@ class Personagem:
     def derrotado(self):
         return self.pm_atual <= 0
 
-# Carregando atributos iniciais dos jogadores e adversários
-jogador1 = Personagem(nome = "Catarina", nome_abr = "J1", afi = "J", posicao_atual_linha = 0, posicao_atual_coluna = 0, pm_max = 1, tec = 10, det = 2, rec = 10)
-jogador2 = Personagem(nome = "Sarah", nome_abr = "J2", afi = "J", posicao_atual_linha = 1, posicao_atual_coluna = 2, pm_max = 1, tec = 12, det = 7, rec = 4)
-jogador3 = Personagem(nome = "Carolina", nome_abr = "J3", afi = "J", posicao_atual_linha = 2, posicao_atual_coluna = 1, pm_max = 1, tec = 14, det = 1, rec = 17)
-        
-adversario1 = Personagem(nome = "Aniratac", nome_abr = "A1", afi = "A", posicao_atual_linha = 1, posicao_atual_coluna = 1, pm_max = 1, tec = 14, det = 5, rec = 1)
-adversario2 = Personagem(nome = "Haras", nome_abr = "A2", afi = "A", posicao_atual_linha = 0, posicao_atual_coluna = 0, pm_max = 1, tec = 14, det = 3, rec = 3)
-adversario3 = Personagem(nome = "Anilorac", nome_abr = "A3", afi = "A", posicao_atual_linha = 2, posicao_atual_coluna = 2, pm_max = 1, tec = 14, det = 0, rec = 6)
+# Ordenação pelo maior valor de REC. Personagens com RECs iguais são escolhidos aleatoriamente, igual em Pokémon
+def ordenar_personagens(personagens):
+    random.shuffle(personagens)
+    personagens_ordenados = sorted(
+        personagens,
+        key=lambda personagem: personagem.rec,
+        reverse=True
+    )
+    return personagens_ordenados
 
-jogadores = [jogador1, jogador2, jogador3]
-adversarios = [adversario1, adversario2, adversario3]
-
+# atualmente só funciona no linux e se executado num terminal nativo...
 def limpar_tela():
     os.system("clear")
 
@@ -50,8 +49,8 @@ def exibir_tabuleiro():
     print()
     print(f"Rodada {rodada_atual}!\n")
     
-    lado_jogador = f"{jogador1.nome}'s BAND"
-    lado_adversario = f"{adversario1.nome}'s BAND"
+    lado_jogador = f"Banda de {jogador1.nome}"
+    lado_adversario = f"Banda de  {adversario1.nome}"
     print(f"{lado_jogador:<40}{lado_adversario}")
     
     for i in range(3):
@@ -136,7 +135,6 @@ def resetar_status(personagens):
             continue
         personagem.status = ""
         
-
 def avancar_rodada(posicao_atual, rodada_atual, personagens):
     posicao_atual += 1
     nova_rodada = False
@@ -147,8 +145,16 @@ def avancar_rodada(posicao_atual, rodada_atual, personagens):
         resetar_status(personagens)
         nova_rodada = True
      
-
     return posicao_atual, rodada_atual, nova_rodada
+
+# Carregando atributos iniciais dos jogadores e adversários
+jogador1 = Personagem(nome = "Catarina", nome_abr = "J1", afi = "J", posicao_atual_linha = 0, posicao_atual_coluna = 0, pm_max = 1, tec = 10, det = 2, rec = 10)
+jogador2 = Personagem(nome = "Sarah", nome_abr = "J2", afi = "J", posicao_atual_linha = 1, posicao_atual_coluna = 2, pm_max = 1, tec = 12, det = 7, rec = 4)
+jogador3 = Personagem(nome = "Carolina", nome_abr = "J3", afi = "J", posicao_atual_linha = 2, posicao_atual_coluna = 1, pm_max = 1, tec = 14, det = 1, rec = 17)
+        
+adversario1 = Personagem(nome = "Aniratac", nome_abr = "A1", afi = "A", posicao_atual_linha = 1, posicao_atual_coluna = 1, pm_max = 1, tec = 14, det = 5, rec = 1)
+adversario2 = Personagem(nome = "Haras", nome_abr = "A2", afi = "A", posicao_atual_linha = 0, posicao_atual_coluna = 0, pm_max = 1, tec = 14, det = 3, rec = 3)
+adversario3 = Personagem(nome = "Anilorac", nome_abr = "A3", afi = "A", posicao_atual_linha = 2, posicao_atual_coluna = 2, pm_max = 1, tec = 14, det = 0, rec = 6)
 
 # Criando tabuleiros
 tabuleiro_jogador = [["□", "□", "□"], ["□", "□", "□"], ["□", "□", "□"]]
@@ -163,6 +169,10 @@ tabuleiro_adversario[adversario1.posicao_atual_linha][adversario1.posicao_atual_
 tabuleiro_adversario[adversario2.posicao_atual_linha][adversario2.posicao_atual_coluna] = adversario2.nome_abr
 tabuleiro_adversario[adversario3.posicao_atual_linha][adversario3.posicao_atual_coluna] = adversario3.nome_abr
 
+jogadores = [jogador1, jogador2, jogador3]
+adversarios = [adversario1, adversario2, adversario3]
+personagens = ordenar_personagens(jogadores + adversarios)
+
 rodada_atual = 1
 
 posicao_atual = 0
@@ -171,14 +181,6 @@ comando_selecionado = ""
 
 acoes_adversario = ['m', 't', 'd']
 
-ordem_personagens = jogadores + adversarios
-random.shuffle(ordem_personagens)
-ordem_personagens = sorted(
-    ordem_personagens,
-    key=lambda personagem: personagem.rec,
-    reverse=True
-)
-
 exibir_tabuleiro()
 
 while True:
@@ -186,13 +188,14 @@ while True:
     # Checagens de fim de jogo
     if all(adversario.derrotado for adversario in adversarios):
         print(f"{jogador1.nome}'s BAND venceu! yay :3")
+        print(f"{jogador1.nome}'s BAND venceu! yay :3")
         break
     
     elif all(jogador.derrotado for jogador in jogadores):
         print(f"{jogador1.nome}'s BAND PERDEU! game over :")
         break
 
-    personagem_atual = ordem_personagens[posicao_atual]
+    personagem_atual = personagens[posicao_atual]
 
     if not personagem_atual.derrotado:
         
@@ -263,7 +266,7 @@ while True:
                     tocar_partitura(personagem_atual, random.choice(jogadores))
                     break
                 elif (acao_adversario_escolhida == 'd'):
-                    if (posicao_atual + 1 == len(ordem_personagens)): #se ele for o último, não faz sentido defender
+                    if (posicao_atual + 1 == len(personagens)): #se ele for o último, não faz sentido defender
                         continue
                     else:
                         defender(personagem_atual)
@@ -272,7 +275,7 @@ while True:
             exibir_tabuleiro()
          
     # Avançamos a rodada                
-    posicao_atual, rodada_atual, nova_rodada = avancar_rodada(posicao_atual, rodada_atual, ordem_personagens)
+    posicao_atual, rodada_atual, nova_rodada = avancar_rodada(posicao_atual, rodada_atual, personagens)
     
     if nova_rodada:
         time.sleep(2)
