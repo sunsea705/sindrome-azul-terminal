@@ -8,6 +8,19 @@ import os
 STATUS_DEFENDENDO = "[DEFENDENDO]"
 STATUS_DERROTADO = "[DERROTADO]"
 
+pontos_de_empolgacao_jogador_atual = 0
+pontos_de_empolgacao_jogador_max = 10
+pontos_de_empolgacao_adversario = 0
+pontos_de_empolgacao_adversario_max = 10
+
+@dataclass
+class Partitura:
+    nome: str
+    alcance: int #range, indo de 1-All
+    alvos: int #targets, indo de 1-3
+    pe_minimo: int #número mínimo de PEs (Pontos de Empolgação) necessários para executar esta partitura
+    tec_adicional: int #bonificador no valor da técnica durante a execução da partitura
+
 @dataclass
 class Personagem:
     nome: str
@@ -126,6 +139,7 @@ def tocar_partitura(atacante, alvo):
 def defender(personagem):
     personagem.defendendo = True
     personagem.status = STATUS_DEFENDENDO
+    if 
     print(f"{personagem.nome} se preparou para defender!\n")
 
 def resetar_status(personagens):
