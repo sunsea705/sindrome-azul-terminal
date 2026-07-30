@@ -8,18 +8,48 @@ import os
 STATUS_DEFENDENDO = "[DEFENDENDO]"
 STATUS_DERROTADO = "[DERROTADO]"
 
-pontos_de_empolgacao_jogador_atual = 0
-pontos_de_empolgacao_jogador_max = 10
-pontos_de_empolgacao_adversario = 0
-pontos_de_empolgacao_adversario_max = 10
+@dataclass
+class Batalha:
+    pontos_de_empolgacao_jogador_atual: int = 0
+    pontos_de_empolgacao_jogador_max: int = 10
+    pontos_de_empolgacao_adversario: int = 0
+    pontos_de_empolgacao_adversario_max: int = 10
+
+    def conceder_pe(self, afiliacao, valor_pe):
+        if afiliacao == "J":
+            self.pontos_de_empolgacao_jogador_atual = min(
+                self.pontos_de_empolgacao_jogador_atual + valor_pe,
+                self.pontos_de_empolgacao_jogador_max
+            )
+        else:
+            self.pontos_de_empolgacao_adversario = min(
+                self.pontos_de_empolgacao_adversario + valor_pe,
+                self.pontos_de_empolgacao_adversario_max
+            )
+            
+    def exibir_pe(self):
+        exibicao_pe_jogador = (
+            f"PE: {self.pontos_de_empolgacao_jogador_atual}/"
+            f"{self.pontos_de_empolgacao_jogador_max}"
+        )
+
+        exibicao_pe_adversario = (
+            f"PE: {self.pontos_de_empolgacao_adversario}/"
+            f"{self.pontos_de_empolgacao_adversario_max}"
+        )
+        
+        print(f"{exibicao_pe_jogador:<40}{exibicao_pe_adversario}")
+        print()
 
 @dataclass
 class Partitura:
     nome: str
+    descricao: str
     alcance: int #range, indo de 1-All
     alvos: int #targets, indo de 1-3
     pe_minimo: int #número mínimo de PEs (Pontos de Empolgação) necessários para executar esta partitura
     tec_adicional: int #bonificador no valor da técnica durante a execução da partitura
+    executar: callable
 
 @dataclass
 class Personagem:
@@ -29,12 +59,13 @@ class Personagem:
     posicao_atual_linha: int
     posicao_atual_coluna: int
     pm_max: int #pm: pontos de moral (HP)
-    pm_atual: int = field(init=False) #hp atual
+    pm_atual: int = field(init = False) #hp atual
     tec: int #tec: técnica (ATK)
     det: int #det: determinação (DEF/RES)
     rec: int #rec: reação (SPD/AGI)
     status: str = "" #flag que guarda status do personagem, como DEFENDENDO, DERROTADO, etc.
     defendendo: bool = False
+    partituras_equipadas: list[Partitura] = field(default_factory = list) # instancia uma nova lista para cada objeto novo criado. pq python por padrão é comunista :p
     
     def __post_init__(self):
         self.pm_atual = self.pm_max #automaticamente seta o pm atual como o valor do pm máximo na instanciação
@@ -57,7 +88,7 @@ def ordenar_personagens(personagens):
 def limpar_tela():
     os.system("clear")
 
-def exibir_tabuleiro():
+def exibir_tabuleiro(batalha_atual):
     limpar_tela()
     print()
     print(f"Rodada {rodada_atual}!\n")
@@ -89,8 +120,9 @@ def exibir_tabuleiro():
 
         print(f"{exibicao_detalhes_jogadores:<40}{exibicao_detalhes_adversarios}")
 
-    print()
-
+    batalha_atual.exibir_pe()
+    
+  
 def movimentar_personagem(personagem, linha = None, coluna = None):
     personagem_jogador = personagem.afi == 'J'
     tabuleiro_selecionado = tabuleiro_jogador if personagem_jogador else tabuleiro_adversario
@@ -123,23 +155,26 @@ def movimentar_personagem(personagem, linha = None, coluna = None):
     print(f"{personagem.nome} se moveu!")
     return True
 
-def tocar_partitura(atacante, alvo):
-    dano = max(atacante.tec - alvo.det, 0) #+ futuros outros modificadores
+# O que se entende por ataque básico é a forma mais simples de se efetuar dano, com apenas 1 possível bônus e sem efeitos adicionais.
+def ataque_basico(batalha_atual, partitura, atacante, alvo):
+    dano = max((atacante.tec + partitura.tec_adicional) - alvo.det, 0)
     if alvo.defendendo: # inicialmente reduz em 15% o dano recebido
         dano *= 0.85
     dano = math.floor(dano + 0.5)
     alvo.pm_atual -= dano
-    print(f"{atacante.nome} ataca {alvo.nome}! {alvo.nome} sofreu {dano} de dano!\n")
+    print(f"{atacante.nome} toca [{partitura.nome}] em {alvo.nome}!")
+    print(f"{alvo.nome} sofreu {dano} de dano!\n")
     if alvo.pm_atual <= 0:
         print(f"{alvo.nome} perdeu toda a sua moral!\n")
         alvo.pm_atual = 0
         alvo.status = STATUS_DERROTADO
         alvo.defendendo = False
-
-def defender(personagem):
+    batalha_atual.conceder_pe(atacante.afi, 4)
+ 
+def defender(batalha_atual, personagem):
     personagem.defendendo = True
     personagem.status = STATUS_DEFENDENDO
-    if 
+    batalha_atual.conceder_pe(personagem.afi, 2)
     print(f"{personagem.nome} se preparou para defender!\n")
 
 def resetar_status(personagens):
@@ -161,14 +196,58 @@ def avancar_rodada(posicao_atual, rodada_atual, personagens):
      
     return posicao_atual, rodada_atual, nova_rodada
 
+# Criando partituras
+partitura_brilha_estrelinha = Partitura(
+    nome = "★ Brilha Brilha, Estrelinha ★",
+    descricao = "Uma musiquinha simples amada por Carolina. É um ataque básico.",
+    alcance = 1, alvos = 1, pe_minimo = 0, tec_adicional = 0,
+    executar = ataque_basico
+)
+partitura_parabens_pra_voce = Partitura(
+    nome = "👏 Parabéns Pra Você! 👏",
+    descricao = "Você já deve ter ouvido antes perto de um bolo. É um ataque básico.",
+    alcance = 1, alvos = 1, pe_minimo = 0, tec_adicional = 0,
+    executar = ataque_basico
+)
+
 # Carregando atributos iniciais dos jogadores e adversários
-jogador1 = Personagem(nome = "Catarina", nome_abr = "J1", afi = "J", posicao_atual_linha = 0, posicao_atual_coluna = 0, pm_max = 1, tec = 10, det = 2, rec = 10)
-jogador2 = Personagem(nome = "Sarah", nome_abr = "J2", afi = "J", posicao_atual_linha = 1, posicao_atual_coluna = 2, pm_max = 1, tec = 12, det = 7, rec = 4)
-jogador3 = Personagem(nome = "Carolina", nome_abr = "J3", afi = "J", posicao_atual_linha = 2, posicao_atual_coluna = 1, pm_max = 1, tec = 14, det = 1, rec = 17)
+jogador1 = Personagem(
+    nome = "Catarina", nome_abr = "J1", afi = "J",
+    posicao_atual_linha = 0, posicao_atual_coluna = 0,
+    pm_max = 1, tec = 10, det = 2, rec = 10,
+    partituras_equipadas = [partitura_brilha_estrelinha]
+)
+jogador2 = Personagem(
+    nome = "Sarah", nome_abr = "J2", afi = "J",
+    posicao_atual_linha = 1, posicao_atual_coluna = 2,
+    pm_max = 1, tec = 12, det = 7, rec = 4,
+    partituras_equipadas = [partitura_brilha_estrelinha]
+)
+jogador3 = Personagem(
+    nome = "Carolina", nome_abr = "J3", afi = "J",
+    posicao_atual_linha = 2, posicao_atual_coluna = 1,
+    pm_max = 1, tec = 14, det = 1, rec = 17,
+    partituras_equipadas = [partitura_brilha_estrelinha]
+)
         
-adversario1 = Personagem(nome = "Aniratac", nome_abr = "A1", afi = "A", posicao_atual_linha = 1, posicao_atual_coluna = 1, pm_max = 1, tec = 14, det = 5, rec = 1)
-adversario2 = Personagem(nome = "Haras", nome_abr = "A2", afi = "A", posicao_atual_linha = 0, posicao_atual_coluna = 0, pm_max = 1, tec = 14, det = 3, rec = 3)
-adversario3 = Personagem(nome = "Anilorac", nome_abr = "A3", afi = "A", posicao_atual_linha = 2, posicao_atual_coluna = 2, pm_max = 1, tec = 14, det = 0, rec = 6)
+adversario1 = Personagem(
+    nome = "Aniratac", nome_abr = "A1", afi = "A",
+    posicao_atual_linha = 1, posicao_atual_coluna = 1,
+    pm_max = 1, tec = 14, det = 5, rec = 1,
+    partituras_equipadas = [partitura_parabens_pra_voce]
+)
+adversario2 = Personagem(
+    nome = "Haras", nome_abr = "A2", afi = "A",
+    posicao_atual_linha = 0, posicao_atual_coluna = 0,
+    pm_max = 1, tec = 14, det = 3, rec = 3,
+    partituras_equipadas = [partitura_parabens_pra_voce]
+)
+adversario3 = Personagem(
+    nome = "Anilorac", nome_abr = "A3", afi = "A",
+    posicao_atual_linha = 2, posicao_atual_coluna = 2,
+    pm_max = 1, tec = 14, det = 0, rec = 6,
+    partituras_equipadas = [partitura_parabens_pra_voce]
+)
 
 # Criando tabuleiros
 tabuleiro_jogador = [["□", "□", "□"], ["□", "□", "□"], ["□", "□", "□"]]
@@ -187,6 +266,8 @@ jogadores = [jogador1, jogador2, jogador3]
 adversarios = [adversario1, adversario2, adversario3]
 personagens = ordenar_personagens(jogadores + adversarios)
 
+batalha_atual = Batalha()
+
 rodada_atual = 1
 
 posicao_atual = 0
@@ -195,18 +276,18 @@ comando_selecionado = ""
 
 acoes_adversario = ['m', 't', 'd']
 
-exibir_tabuleiro()
+exibir_tabuleiro(batalha_atual)
 
 while True:
 
     # Checagens de fim de jogo
     if all(adversario.derrotado for adversario in adversarios):
-        print(f"{jogador1.nome}'s BAND venceu! yay :3")
-        print(f"{jogador1.nome}'s BAND venceu! yay :3")
+        print(f"Banda de {jogador1.nome} venceu! yay :3")
+        print(f"O grupo inteiro ganhou 37 XP!")
         break
     
     elif all(jogador.derrotado for jogador in jogadores):
-        print(f"{jogador1.nome}'s BAND PERDEU! game over :")
+        print(f"Banda de {jogador1.nome} PERDEU! game over :(")
         break
 
     personagem_atual = personagens[posicao_atual]
@@ -244,16 +325,27 @@ while True:
                         if adversario.derrotado:
                             continue
                         print(f"{i + 1}. ({adversario.nome_abr}) {adversario.nome}")
-                    indice = int(input(">> "))
-                    if indice < 1 or indice > len(adversarios):
+                    indice_alvo = int(input(">> "))
+                    if indice_alvo < 1 or indice_alvo > len(adversarios):
                         print("Mas esse adversário não existe...")
                     else:
-                        tocar_partitura(personagem_atual, adversarios[indice - 1])
+                        while True:
+                            print("Escolha a partitura:")
+                            for i, partitura in enumerate(personagem_atual.partituras_equipadas):
+                                 print(f"{i + 1}. {partitura.nome} ({partitura.descricao})")
+                            indice_partitura = int(input(">> "))
+                            if indice_partitura < 1 or indice_partitura > len(personagem_atual.partituras_equipadas):
+                                print("Mas essa partitura não existe...")
+                                continue
+                            else:
+                                partitura_escolhida = personagem_atual.partituras_equipadas[indice_partitura - 1]
+                                partitura_escolhida.executar(batalha_atual, partitura_escolhida, personagem_atual, adversarios[indice_alvo - 1])
+                                break
                         acao_realizada = True
                         break
         
             elif (comando_selecionado == 'd'):
-                defender(personagem_atual)
+                defender(batalha_atual, personagem_atual)
                 acao_realizada = True
 
             elif (comando_selecionado == 'e'):
@@ -267,7 +359,7 @@ while True:
                 continue
 
             time.sleep(2)
-            exibir_tabuleiro()
+            exibir_tabuleiro(batalha_atual)
 
         # Ação do adversário
         else:
@@ -277,22 +369,24 @@ while True:
                     movimentar_personagem(personagem_atual)
                     break
                 elif (acao_adversario_escolhida == 't'):
-                    tocar_partitura(personagem_atual, random.choice(jogadores))
+                    partitura_escolhida = random.choice(personagem_atual.partituras_equipadas)
+                    partitura_escolhida.executar(batalha_atual, partitura_escolhida, personagem_atual, random.choice(jogadores))
+
                     break
                 elif (acao_adversario_escolhida == 'd'):
                     if (posicao_atual + 1 == len(personagens)): #se ele for o último, não faz sentido defender
                         continue
                     else:
-                        defender(personagem_atual)
+                        defender(batalha_atual, personagem_atual)
                         break
             time.sleep(2)
-            exibir_tabuleiro()
+            exibir_tabuleiro(batalha_atual)
          
     # Avançamos a rodada                
     posicao_atual, rodada_atual, nova_rodada = avancar_rodada(posicao_atual, rodada_atual, personagens)
     
     if nova_rodada:
         time.sleep(2)
-        exibir_tabuleiro()
+        exibir_tabuleiro(batalha_atual)
         
     continue
