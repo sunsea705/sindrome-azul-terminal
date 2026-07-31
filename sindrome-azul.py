@@ -5,6 +5,7 @@ import time
 import math
 import os
 
+# Labels constantes
 STATUS_DEFENDENDO = "[DEFENDENDO]"
 STATUS_DERROTADO = "[DERROTADO]"
 
@@ -37,7 +38,6 @@ class Batalha:
             f"PE: {self.pontos_de_empolgacao_adversario}/"
             f"{self.pontos_de_empolgacao_adversario_max}"
         )
-        
         print(f"{exibicao_pe_jogador:<40}{exibicao_pe_adversario}")
         print()
 
@@ -48,8 +48,9 @@ class Partitura:
     alcance: int #range, indo de 1-All
     alvos: int #targets, indo de 1-3
     pe_minimo: int #número mínimo de PEs (Pontos de Empolgação) necessários para executar esta partitura
-    tec_adicional: int #bonificador no valor da técnica durante a execução da partitura
-    executar: callable
+    modificador: float #modificador usado no cálculo das fórmulas
+    bonus: int #bonificador usado para adicionar no valor final da fórmula
+    tocar_partitura: callable #função chamada que executa a partitura
 
 @dataclass
 class Personagem:
@@ -122,7 +123,6 @@ def exibir_tabuleiro(batalha_atual):
 
     batalha_atual.exibir_pe()
     
-  
 def movimentar_personagem(personagem, linha = None, coluna = None):
     personagem_jogador = personagem.afi == 'J'
     tabuleiro_selecionado = tabuleiro_jogador if personagem_jogador else tabuleiro_adversario
@@ -155,9 +155,9 @@ def movimentar_personagem(personagem, linha = None, coluna = None):
     print(f"{personagem.nome} se moveu!")
     return True
 
-# O que se entende por ataque básico é a forma mais simples de se efetuar dano, com apenas 1 possível bônus e sem efeitos adicionais.
+# O que se entende por ataque básico é a forma mais simples de se efetuar dano, sem efeitos adicionais.
 def ataque_basico(batalha_atual, partitura, atacante, alvo):
-    dano = max((atacante.tec + partitura.tec_adicional) - alvo.det, 0)
+    dano = max(((atacante.tec * partitura.modificador) + partitura.bonus) - alvo.det, 0)
     if alvo.defendendo: # inicialmente reduz em 15% o dano recebido
         dano *= 0.85
     dano = math.floor(dano + 0.5)
@@ -170,6 +170,17 @@ def ataque_basico(batalha_atual, partitura, atacante, alvo):
         alvo.status = STATUS_DERROTADO
         alvo.defendendo = False
     batalha_atual.conceder_pe(atacante.afi, 4)
+
+# Cura básica é baseada no PM máx. do alvo através dos valores de modificador e bônus da partitura
+def cura_basica(batalha_atual, partitura, atacante, alvo):
+    pm_recuperado = round(alvo.pm_max * partitura.modificador) + partitura.bonus
+    alvo.pm_atual = min(alvo.pm_atual + cura, alvo.pm_max)
+    print(f"{atacante.nome} toca [{partitura.nome}] em {alvo.nome}!")
+    if (alvo.pm_atual + cura) >= alvo.pm_max:
+        print(f"{alvo.nome} teve todo seu PM recuperado!")
+    else:
+        print(f"{alvo.nome} recuperou {pm_recuperado} PM!")
+    batalha_atual.conceder_pe(atacante.afi, 2)
  
 def defender(batalha_atual, personagem):
     personagem.defendendo = True
@@ -198,35 +209,41 @@ def avancar_rodada(posicao_atual, rodada_atual, personagens):
 
 # Criando partituras
 partitura_brilha_estrelinha = Partitura(
-    nome = "★ Brilha Brilha, Estrelinha ★",
+    nome = "Brilha Brilha, Estrelinha ★",
     descricao = "Uma musiquinha simples amada por Carolina. É um ataque básico.",
-    alcance = 1, alvos = 1, pe_minimo = 0, tec_adicional = 0,
-    executar = ataque_basico
+    alcance = 1, alvos = 1, pe_minimo = 0, modificador = 1, bonus = 0,
+    tocar_partitura = ataque_basico
 )
 partitura_parabens_pra_voce = Partitura(
-    nome = "👏 Parabéns Pra Você! 👏",
+    nome = "Parabéns Pra Você! 👏",
     descricao = "Você já deve ter ouvido antes perto de um bolo. É um ataque básico.",
-    alcance = 1, alvos = 1, pe_minimo = 0, tec_adicional = 0,
-    executar = ataque_basico
+    alcance = 1, alvos = 1, pe_minimo = 0, modificador = 1, bonus = 0,
+    tocar_partitura = ataque_basico
+)
+partitura_beijinho_doce = Partitura(
+    nome = "Beijinho Doce 💋 ",
+    descricao = "Quem não adora um beijinho? Cura uma pequena quantidade de PM do alvo.",
+    alcance = 1, alvos = 1, pe_minimo = 0, modificador = 0.1, bonus = 5,
+    tocar_partitura = cura_basica
 )
 
 # Carregando atributos iniciais dos jogadores e adversários
 jogador1 = Personagem(
     nome = "Catarina", nome_abr = "J1", afi = "J",
     posicao_atual_linha = 0, posicao_atual_coluna = 0,
-    pm_max = 1, tec = 10, det = 2, rec = 10,
-    partituras_equipadas = [partitura_brilha_estrelinha]
+    pm_max = 42, tec = 10, det = 2, rec = 10,
+    partituras_equipadas = []
 )
 jogador2 = Personagem(
     nome = "Sarah", nome_abr = "J2", afi = "J",
     posicao_atual_linha = 1, posicao_atual_coluna = 2,
-    pm_max = 1, tec = 12, det = 7, rec = 4,
-    partituras_equipadas = [partitura_brilha_estrelinha]
+    pm_max = 55, tec = 12, det = 7, rec = 4,
+    partituras_equipadas = [partitura_beijinho_doce]
 )
 jogador3 = Personagem(
     nome = "Carolina", nome_abr = "J3", afi = "J",
     posicao_atual_linha = 2, posicao_atual_coluna = 1,
-    pm_max = 1, tec = 14, det = 1, rec = 17,
+    pm_max = 31, tec = 14, det = 1, rec = 17,
     partituras_equipadas = [partitura_brilha_estrelinha]
 )
         
@@ -339,7 +356,7 @@ while True:
                                 continue
                             else:
                                 partitura_escolhida = personagem_atual.partituras_equipadas[indice_partitura - 1]
-                                partitura_escolhida.executar(batalha_atual, partitura_escolhida, personagem_atual, adversarios[indice_alvo - 1])
+                                partitura_escolhida.tocar_partitura(batalha_atual, partitura_escolhida, personagem_atual, adversarios[indice_alvo - 1])
                                 break
                         acao_realizada = True
                         break
@@ -370,7 +387,7 @@ while True:
                     break
                 elif (acao_adversario_escolhida == 't'):
                     partitura_escolhida = random.choice(personagem_atual.partituras_equipadas)
-                    partitura_escolhida.executar(batalha_atual, partitura_escolhida, personagem_atual, random.choice(jogadores))
+                    partitura_escolhida.tocar_partitura(batalha_atual, partitura_escolhida, personagem_atual, random.choice(jogadores))
 
                     break
                 elif (acao_adversario_escolhida == 'd'):
