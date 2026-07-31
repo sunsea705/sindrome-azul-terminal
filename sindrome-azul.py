@@ -8,6 +8,8 @@ import os
 # Labels constantes
 STATUS_DEFENDENDO = "[DEFENDENDO]"
 STATUS_DERROTADO = "[DERROTADO]"
+CLASSIFICACAO_PARTITURA_ATAQUE = "[ATAQUE]"
+CLASSIFICACAO_PARTITURA_CURA_PM = "[CURA_PM]"
 
 @dataclass
 class Batalha:
@@ -45,6 +47,7 @@ class Batalha:
 class Partitura:
     nome: str
     descricao: str
+    classificacao: str #serve pra diferenciar entre os tipos de partitura (ataque, cura, etc...)
     alcance: int #range, indo de 1-All
     alvos: int #targets, indo de 1-3
     pe_minimo: int #número mínimo de PEs (Pontos de Empolgação) necessários para executar esta partitura
@@ -211,18 +214,21 @@ def avancar_rodada(posicao_atual, rodada_atual, personagens):
 partitura_brilha_estrelinha = Partitura(
     nome = "Brilha Brilha, Estrelinha ★",
     descricao = "Uma musiquinha simples amada por Carolina. É um ataque básico.",
+    classificacao = CLASSIFICACAO_PARTITURA_ATAQUE,
     alcance = 1, alvos = 1, pe_minimo = 0, modificador = 1, bonus = 0,
     tocar_partitura = ataque_basico
 )
 partitura_parabens_pra_voce = Partitura(
     nome = "Parabéns Pra Você! 👏",
     descricao = "Você já deve ter ouvido antes perto de um bolo. É um ataque básico.",
+    classificacao = CLASSIFICACAO_PARTITURA_ATAQUE,
     alcance = 1, alvos = 1, pe_minimo = 0, modificador = 1, bonus = 0,
     tocar_partitura = ataque_basico
 )
 partitura_beijinho_doce = Partitura(
     nome = "Beijinho Doce 💋 ",
     descricao = "Quem não adora um beijinho? Cura uma pequena quantidade de PM do alvo.",
+    classificacao = CLASSIFICACAO_PARTITURA_CURA_PM,
     alcance = 1, alvos = 1, pe_minimo = 0, modificador = 0.1, bonus = 5,
     tocar_partitura = cura_basica
 )
@@ -336,28 +342,38 @@ while True:
                         break
                     
             elif (comando_selecionado == 't'):
+                partitura_escolhida = None
+                alvo_escolhido = None
+                # Escolha da partitura
                 while True:
-                    print("Escolha o adversário:")
-                    for i, adversario in enumerate(adversarios):
-                        if adversario.derrotado:
+                    print("Escolha a partitura:")
+                    for i, partitura in enumerate(personagem_atual.partituras_equipadas):
+                        print(f"{i + 1}. {partitura.nome} ({partitura.descricao})")
+                        indice_partitura = int(input(">> "))
+                        if indice_partitura < 1 or indice_partitura > len(personagem_atual.partituras_equipadas):
+                            print("Mas essa partitura não existe...")
                             continue
-                        print(f"{i + 1}. ({adversario.nome_abr}) {adversario.nome}")
+                        else:
+                            partitura_escolhida = personagem_atual.partituras_equipadas[indice_partitura - 1]
+                            break
+                # Escolha do alvo
+                while True:
+                    print("Escolha o alvo:")
+                    lista_alvos = None
+                    if partitura_escolhida.classificacao == CLASSIFICACAO_PARTITURA_ATAQUE:
+                        lista_alvos = adversarios
+                    elif partitura_escolhida.classificacao == CLASSIFICACAO_PARTITURA_CURA_PM:
+                        lista_alvos = jogadores
+                    for i, alvo in enumerate(lista_alvos):
+                        if alvo.derrotado:
+                            continue
+                        print(f"{i + 1}. ({alvo.nome_abr}) {alvo.nome}")
                     indice_alvo = int(input(">> "))
-                    if indice_alvo < 1 or indice_alvo > len(adversarios):
-                        print("Mas esse adversário não existe...")
+                    if indice_alvo < 1 or indice_alvo > len(lista_alvos):
+                        print("Mas esse alvo não existe...")
                     else:
-                        while True:
-                            print("Escolha a partitura:")
-                            for i, partitura in enumerate(personagem_atual.partituras_equipadas):
-                                 print(f"{i + 1}. {partitura.nome} ({partitura.descricao})")
-                            indice_partitura = int(input(">> "))
-                            if indice_partitura < 1 or indice_partitura > len(personagem_atual.partituras_equipadas):
-                                print("Mas essa partitura não existe...")
-                                continue
-                            else:
-                                partitura_escolhida = personagem_atual.partituras_equipadas[indice_partitura - 1]
-                                partitura_escolhida.tocar_partitura(batalha_atual, partitura_escolhida, personagem_atual, adversarios[indice_alvo - 1])
-                                break
+                        alvo_escolhido = lista_alvos[indice_alvo - 1]
+                        partitura_escolhida.tocar_partitura(batalha_atual, partitura_escolhida, personagem_atual, alvo_escolhido)
                         acao_realizada = True
                         break
         
