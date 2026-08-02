@@ -177,12 +177,12 @@ def ataque_basico(batalha_atual, partitura, atacante, alvo):
 # Cura básica é baseada no PM máx. do alvo através dos valores de modificador e bônus da partitura
 def cura_basica(batalha_atual, partitura, atacante, alvo):
     pm_recuperado = round(alvo.pm_max * partitura.modificador) + partitura.bonus
-    alvo.pm_atual = min(alvo.pm_atual + cura, alvo.pm_max)
+    alvo.pm_atual = min(alvo.pm_atual + pm_recuperado, alvo.pm_max)
     print(f"{atacante.nome} toca [{partitura.nome}] em {alvo.nome}!")
-    if (alvo.pm_atual + cura) >= alvo.pm_max:
-        print(f"{alvo.nome} teve todo seu PM recuperado!")
-    else:
-        print(f"{alvo.nome} recuperou {pm_recuperado} PM!")
+    mensagem_recuperacao_pm = f"{alvo.nome} recuperou {pm_recuperado} PM!"
+    if alvo.pm_atual == alvo.pm_max:
+        mensagem_recuperacao_pm += f" {alvo.nome} teve todo seu PM recuperado!"
+    print(mensagem_recuperacao_pm)
     batalha_atual.conceder_pe(atacante.afi, 2)
  
 def defender(batalha_atual, personagem):
@@ -229,7 +229,7 @@ partitura_beijinho_doce = Partitura(
     nome = "Beijinho Doce 💋 ",
     descricao = "Quem não adora um beijinho? Cura uma pequena quantidade de PM do alvo.",
     classificacao = CLASSIFICACAO_PARTITURA_CURA_PM,
-    alcance = 1, alvos = 1, pe_minimo = 0, modificador = 0.1, bonus = 5,
+    alcance = 1, alvos = 1, pe_minimo = 0, modificador = 0.1, bonus = 10,
     tocar_partitura = cura_basica
 )
 
@@ -297,7 +297,7 @@ posicao_atual = 0
 
 comando_selecionado = ""
 
-acoes_adversario = ['m', 't', 'd']
+acoes_adversario = ['t']
 
 exibir_tabuleiro(batalha_atual)
 
@@ -343,23 +343,22 @@ while True:
                     
             elif (comando_selecionado == 't'):
                 partitura_escolhida = None
-                alvo_escolhido = None
                 # Escolha da partitura
                 while True:
                     print("Escolha a partitura:")
                     for i, partitura in enumerate(personagem_atual.partituras_equipadas):
                         print(f"{i + 1}. {partitura.nome} ({partitura.descricao})")
-                        indice_partitura = int(input(">> "))
-                        if indice_partitura < 1 or indice_partitura > len(personagem_atual.partituras_equipadas):
-                            print("Mas essa partitura não existe...")
-                            continue
-                        else:
-                            partitura_escolhida = personagem_atual.partituras_equipadas[indice_partitura - 1]
-                            break
+                    indice_partitura = int(input(">> "))
+                    if indice_partitura < 1 or indice_partitura > len(personagem_atual.partituras_equipadas):
+                        print("Mas essa partitura não existe...")
+                    else:
+                        partitura_escolhida = personagem_atual.partituras_equipadas[indice_partitura - 1]
+                        break
                 # Escolha do alvo
                 while True:
-                    print("Escolha o alvo:")
                     lista_alvos = None
+                    alvo_escolhido = None
+                    print("Escolha o alvo:")
                     if partitura_escolhida.classificacao == CLASSIFICACAO_PARTITURA_ATAQUE:
                         lista_alvos = adversarios
                     elif partitura_escolhida.classificacao == CLASSIFICACAO_PARTITURA_CURA_PM:
