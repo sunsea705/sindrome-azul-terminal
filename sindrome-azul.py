@@ -6,10 +6,12 @@ import math
 import os
 
 # Labels constantes
+TECNICA = "[TEC]"
 STATUS_DEFENDENDO = "[DEFENDENDO]"
 STATUS_DERROTADO = "[DERROTADO]"
 CLASSIFICACAO_PARTITURA_ATAQUE = "[ATAQUE]"
 CLASSIFICACAO_PARTITURA_CURA_PM = "[CURA_PM]"
+CLASSIFICACAO_PARTITURA_BUFF = "[BUFF]"
 
 @dataclass
 class Batalha:
@@ -68,6 +70,7 @@ class Personagem:
     det: int #det: determinação (DEF/RES)
     rec: int #rec: reação (SPD/AGI)
     status: str = "" #flag que guarda status do personagem, como DEFENDENDO, DERROTADO, etc.
+    atributo_buffado = ""
     defendendo: bool = False
     partituras_equipadas: list[Partitura] = field(default_factory = list) # instancia uma nova lista para cada objeto novo criado. pq python por padrão é comunista :p
     
