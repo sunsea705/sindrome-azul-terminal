@@ -283,7 +283,7 @@ partitura_atencao_basica = Partitura(
     nome = "Atenção Básica! ⚠",
     descricao = "Atenção na contramão! Aumenta levemente a defesa do aliado, reduzindo levemente o dano recebido até o fim da rodada.",
     classificacao = ClassificacaoPartitura.BUFF_DETERMINACAO,
-    alcance = 1, alvos = 1, pe_minimo = 0, modificador = 0.25, bonus = 0,
+    alcance = 1, alvos = 1, pe_minimo = 0, modificador = 0.75, bonus = 0,
     tocar_partitura = partitura_basica_conceder_buff
 )
 
