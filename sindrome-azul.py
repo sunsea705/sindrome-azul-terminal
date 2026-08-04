@@ -1,18 +1,41 @@
 from dataclasses import dataclass, field
+from enum import Enum
 from itertools import zip_longest
 import random
 import time
 import math
 import os
 
-# Labels constantes
-TECNICA = "[TEC]"
-STATUS_DEFENDENDO = "[DEFENDENDO]"
-STATUS_DERROTADO = "[DERROTADO]"
-CLASSIFICACAO_PARTITURA_ATAQUE = "[ATAQUE]"
-CLASSIFICACAO_PARTITURA_CURA_PM = "[CURA_PM]"
-CLASSIFICACAO_PARTITURA_BUFF = "[BUFF]"
 
+class Status(Enum):
+    SEM_STATUS = ""
+    DEFENDENDO = "DEFENDENDO"
+    DERROTADO = "DERROTADO"
+
+    def __str__(self):
+        if self != self.SEM_STATUS:
+            return f"[{self.value}]"
+        else:
+            return ""
+
+class ClassificacaoPartitura(Enum):
+    ATAQUE = "ATAQUE"
+    CURA_PM = "CURA_PM"
+    BUFF_TECNICA = "BUFF_TECNICA"
+    BUFF_DETERMINACAO = "BUFF_DETERMINACAO"
+    DEBUFF_TECNICA = "DEBUFF_TECNICA"
+    DEBUFF_DETERMINACAO = "DEBUFF_DETERMINACAO"
+
+    def __str__(self):
+        return f"[{self.value}]"
+
+class Atributo(Enum):
+    TECNICA = "TÉCNICA"
+    DETERMINACAO = "DETERMINAÇÃO"
+
+    def __str__(self):
+        return f"[{self.value}]"
+    
 @dataclass
 class Batalha:
     pontos_de_empolgacao_jogador_atual: int = 0
@@ -37,7 +60,6 @@ class Batalha:
             f"PE: {self.pontos_de_empolgacao_jogador_atual}/"
             f"{self.pontos_de_empolgacao_jogador_max}"
         )
-
         exibicao_pe_adversario = (
             f"PE: {self.pontos_de_empolgacao_adversario}/"
             f"{self.pontos_de_empolgacao_adversario_max}"
@@ -49,7 +71,7 @@ class Batalha:
 class Partitura:
     nome: str
     descricao: str
-    classificacao: str #serve pra diferenciar entre os tipos de partitura (ataque, cura, etc...)
+    classificacao: ClassificacaoPartitura #serve pra diferenciar entre os tipos de partitura (ataque, cura, etc...)
     alcance: int #range, indo de 1-All
     alvos: int #targets, indo de 1-3
     pe_minimo: int #número mínimo de PEs (Pontos de Empolgação) necessários para executar esta partitura
@@ -69,8 +91,9 @@ class Personagem:
     tec: int #tec: técnica (ATK)
     det: int #det: determinação (DEF/RES)
     rec: int #rec: reação (SPD/AGI)
-    status: str = "" #flag que guarda status do personagem, como DEFENDENDO, DERROTADO, etc.
-    atributo_buffado = ""
+    status: str = Status.SEM_STATUS #flag que guarda status do personagem, como DEFENDENDO, DERROTADO, etc.
+    atributo_buffado: Atributo | None = None #identificador de algum atributo que esteja com modificador no momento
+    valor_buff: float = 1 #valor do modificador para aquele buff em questão
     defendendo: bool = False
     partituras_equipadas: list[Partitura] = field(default_factory = list) # instancia uma nova lista para cada objeto novo criado. pq python por padrão é comunista :p
     
@@ -82,7 +105,7 @@ class Personagem:
         return self.pm_atual <= 0
 
 # Ordenação pelo maior valor de REC. Personagens com RECs iguais são escolhidos aleatoriamente, igual em Pokémon
-def ordenar_personagens(personagens):
+def ordenar_personagens(personagens: list[Personagem]):
     random.shuffle(personagens)
     personagens_ordenados = sorted(
         personagens,
@@ -95,7 +118,7 @@ def ordenar_personagens(personagens):
 def limpar_tela():
     os.system("clear")
 
-def exibir_tabuleiro(batalha_atual):
+def exibir_tabuleiro(batalha_atual: Batalha):
     limpar_tela()
     print()
     print(f"Rodada {rodada_atual}!\n")
@@ -129,7 +152,7 @@ def exibir_tabuleiro(batalha_atual):
 
     batalha_atual.exibir_pe()
     
-def movimentar_personagem(personagem, linha = None, coluna = None):
+def movimentar_personagem(personagem: Personagem, linha: int | None = None, coluna: int | None = None):
     personagem_jogador = personagem.afi == 'J'
     tabuleiro_selecionado = tabuleiro_jogador if personagem_jogador else tabuleiro_adversario
     
@@ -162,10 +185,15 @@ def movimentar_personagem(personagem, linha = None, coluna = None):
     return True
 
 # O que se entende por ataque básico é a forma mais simples de se efetuar dano, sem efeitos adicionais.
-def ataque_basico(batalha_atual, partitura, atacante, alvo):
-    dano = max(((atacante.tec * partitura.modificador) + partitura.bonus) - alvo.det, 0)
-    if alvo.defendendo: # inicialmente reduz em 15% o dano recebido
+def ataque_basico(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvo: Personagem):
+    tecnica_atacante = atacante.tec
+    if (atacante.atributo_buffado == Atributo.TECNICA):
+        tecnica_atacante *= atacante.valor_buff
+    dano = max(((tecnica_atacante * partitura.modificador) + partitura.bonus) - alvo.det, 0)
+    if alvo.defendendo: # por padrão reduz em 15% o dano recebido
         dano *= 0.85
+    if alvo.atributo_buffado == Atributo.DETERMINACAO:
+        dano *= alvo.valor_buff
     dano = math.floor(dano + 0.5)
     alvo.pm_atual -= dano
     print(f"{atacante.nome} toca [{partitura.nome}] em {alvo.nome}!")
@@ -173,12 +201,12 @@ def ataque_basico(batalha_atual, partitura, atacante, alvo):
     if alvo.pm_atual <= 0:
         print(f"{alvo.nome} perdeu toda a sua moral!\n")
         alvo.pm_atual = 0
-        alvo.status = STATUS_DERROTADO
+        alvo.status = Status.DERROTADO
         alvo.defendendo = False
     batalha_atual.conceder_pe(atacante.afi, 4)
 
 # Cura básica é baseada no PM máx. do alvo através dos valores de modificador e bônus da partitura
-def cura_basica(batalha_atual, partitura, atacante, alvo):
+def cura_basica(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvo: Personagem):
     pm_recuperado = round(alvo.pm_max * partitura.modificador) + partitura.bonus
     alvo.pm_atual = min(alvo.pm_atual + pm_recuperado, alvo.pm_max)
     print(f"{atacante.nome} toca [{partitura.nome}] em {alvo.nome}!")
@@ -187,21 +215,37 @@ def cura_basica(batalha_atual, partitura, atacante, alvo):
         mensagem_recuperacao_pm += f" {alvo.nome} teve todo seu PM recuperado!"
     print(mensagem_recuperacao_pm)
     batalha_atual.conceder_pe(atacante.afi, 2)
+
+# Função simples e genérica para concender buffs
+def partitura_basica_conceder_buff(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvo: Personagem):
+    match partitura.classificacao:
+        case ClassificacaoPartitura.BUFF_TECNICA:
+            alvo.atributo_buffado = Atributo.TECNICA
+        case ClassificacaoPartitura.BUFF_DETERMINACAO:
+            alvo.atributo_buffado = Atributo.DETERMINACAO
+        case _:
+            alvo.atributo_buffado = None
+    alvo.valor_buff = partitura.modificador
+    print(f"{atacante.nome} toca [{partitura.nome}] em {alvo.nome}!")
+    print(f"{alvo.nome} teve {alvo.atributo_buffado} aumentado pelo resto da rodada!")
+    batalha_atual.conceder_pe(atacante.afi, 2)
  
-def defender(batalha_atual, personagem):
+def defender(batalha_atual: Batalha, personagem: Personagem):
     personagem.defendendo = True
-    personagem.status = STATUS_DEFENDENDO
+    personagem.status = Status.DEFENDENDO
     batalha_atual.conceder_pe(personagem.afi, 2)
     print(f"{personagem.nome} se preparou para defender!\n")
 
-def resetar_status(personagens):
+def resetar_status(personagens: list[Personagem]):
     for personagem in personagens:
         personagem.defendendo = False
         if personagem.derrotado:
             continue
-        personagem.status = ""
+        personagem.status = Status.SEM_STATUS
+        personagem.atributo_buffado = None
+        personagem.valor_buff = 1
         
-def avancar_rodada(posicao_atual, rodada_atual, personagens):
+def avancar_rodada(posicao_atual: int, rodada_atual: int, personagens: list[Personagem]):
     posicao_atual += 1
     nova_rodada = False
 
@@ -217,23 +261,30 @@ def avancar_rodada(posicao_atual, rodada_atual, personagens):
 partitura_brilha_estrelinha = Partitura(
     nome = "Brilha Brilha, Estrelinha ★",
     descricao = "Uma musiquinha simples amada por Carolina. É um ataque básico.",
-    classificacao = CLASSIFICACAO_PARTITURA_ATAQUE,
+    classificacao = ClassificacaoPartitura.ATAQUE,
     alcance = 1, alvos = 1, pe_minimo = 0, modificador = 1, bonus = 0,
     tocar_partitura = ataque_basico
 )
 partitura_parabens_pra_voce = Partitura(
     nome = "Parabéns Pra Você! 👏",
     descricao = "Você já deve ter ouvido antes perto de um bolo. É um ataque básico.",
-    classificacao = CLASSIFICACAO_PARTITURA_ATAQUE,
+    classificacao = ClassificacaoPartitura.ATAQUE,
     alcance = 1, alvos = 1, pe_minimo = 0, modificador = 1, bonus = 0,
     tocar_partitura = ataque_basico
 )
 partitura_beijinho_doce = Partitura(
     nome = "Beijinho Doce 💋 ",
     descricao = "Quem não adora um beijinho? Cura uma pequena quantidade de PM do alvo.",
-    classificacao = CLASSIFICACAO_PARTITURA_CURA_PM,
+    classificacao = ClassificacaoPartitura.CURA_PM,
     alcance = 1, alvos = 1, pe_minimo = 0, modificador = 0.1, bonus = 10,
     tocar_partitura = cura_basica
+)
+partitura_atencao_basica = Partitura(
+    nome = "Atenção Básica! ⚠",
+    descricao = "Atenção na contramão! Aumenta levemente a defesa do aliado, reduzindo levemente o dano recebido até o fim da rodada.",
+    classificacao = ClassificacaoPartitura.BUFF_DETERMINACAO,
+    alcance = 1, alvos = 1, pe_minimo = 0, modificador = 0.25, bonus = 0,
+    tocar_partitura = partitura_basica_conceder_buff
 )
 
 # Carregando atributos iniciais dos jogadores e adversários
@@ -241,7 +292,7 @@ jogador1 = Personagem(
     nome = "Catarina", nome_abr = "J1", afi = "J",
     posicao_atual_linha = 0, posicao_atual_coluna = 0,
     pm_max = 42, tec = 10, det = 2, rec = 10,
-    partituras_equipadas = []
+    partituras_equipadas = [partitura_atencao_basica]
 )
 jogador2 = Personagem(
     nome = "Sarah", nome_abr = "J2", afi = "J",
@@ -362,10 +413,11 @@ while True:
                     lista_alvos = None
                     alvo_escolhido = None
                     print("Escolha o alvo:")
-                    if partitura_escolhida.classificacao == CLASSIFICACAO_PARTITURA_ATAQUE:
-                        lista_alvos = adversarios
-                    elif partitura_escolhida.classificacao == CLASSIFICACAO_PARTITURA_CURA_PM:
-                        lista_alvos = jogadores
+                    match partitura_escolhida.classificacao:
+                        case ClassificacaoPartitura.ATAQUE | ClassificacaoPartitura.DEBUFF_TECNICA | ClassificacaoPartitura.DEBUFF_DETERMINACAO:
+                            lista_alvos = adversarios
+                        case ClassificacaoPartitura.CURA_PM | ClassificacaoPartitura.BUFF_TECNICA | ClassificacaoPartitura.BUFF_DETERMINACAO:
+                            lista_alvos = jogadores
                     for i, alvo in enumerate(lista_alvos):
                         if alvo.derrotado:
                             continue
