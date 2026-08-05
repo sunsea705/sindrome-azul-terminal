@@ -6,7 +6,6 @@ import time
 import math
 import os
 
-
 class Status(Enum):
     SEM_STATUS = ""
     DEFENDENDO = "DEFENDENDO"
@@ -205,6 +204,15 @@ def ataque_basico(batalha_atual: Batalha, partitura: Partitura, atacante: Person
         alvo.defendendo = False
     batalha_atual.conceder_pe(atacante.afi, 4)
 
+def ataque_basico_elaborado(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvos: list[Personagem]):
+    tecnica_atacante = atacante.tec
+    if (atacante.atributo_buffado == Atributo.TECNICA):
+        tecnica_atacante *= atacante.valor_buff
+    nomes_alvos = ", ".join(alvo.nome for alvo in alvos)
+    print(f"{atacante.nome} toca [{partitura.nome}] em {nomes_alvos}!")
+    for alvo in alvos:
+
+
 # Cura básica é baseada no PM máx. do alvo através dos valores de modificador e bônus da partitura
 def cura_basica(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvo: Personagem):
     pm_recuperado = round(alvo.pm_max * partitura.modificador) + partitura.bonus
@@ -217,7 +225,7 @@ def cura_basica(batalha_atual: Batalha, partitura: Partitura, atacante: Personag
     batalha_atual.conceder_pe(atacante.afi, 2)
 
 # Função simples e genérica para concender buffs
-def partitura_basica_conceder_buff(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvo: Personagem):
+def conceder_buff_basico(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvo: Personagem):
     match partitura.classificacao:
         case ClassificacaoPartitura.BUFF_TECNICA:
             alvo.atributo_buffado = Atributo.TECNICA
@@ -286,7 +294,13 @@ partitura_atencao_basica = Partitura(
     alcance = 1, alvos = 1, pe_minimo = 0, modificador = 0.75, bonus = 0,
     tocar_partitura = partitura_basica_conceder_buff
 )
-
+partitura_musica_da_marcha_azul = Partitura(
+    nome = "Marcha da Música Azul 🔵",
+    descricao = "Primeiro aperfeiçoamento musical de Carolina. Alcance aumentado e atinge entre 1 a 2 adversários.",
+    classificacao = ClassificacaoPartitura.ATAQUE,
+    alcance = 2, alvos = 2, pe_minimo = 10, modificador = 1, bonus = 4,
+    tocar_paritura = ataque_basico_elaborado
+)
 # Carregando atributos iniciais dos jogadores e adversários
 jogador1 = Personagem(
     nome = "Catarina", nome_abr = "J1", afi = "J",
@@ -304,7 +318,7 @@ jogador3 = Personagem(
     nome = "Carolina", nome_abr = "J3", afi = "J",
     posicao_atual_linha = 2, posicao_atual_coluna = 1,
     pm_max = 31, tec = 14, det = 1, rec = 17,
-    partituras_equipadas = [partitura_brilha_estrelinha]
+    partituras_equipadas = [partitura_brilha_estrelinha, partitura_musica_da_marcha_azul]
 )
         
 adversario1 = Personagem(
