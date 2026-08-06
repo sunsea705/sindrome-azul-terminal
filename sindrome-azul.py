@@ -96,7 +96,7 @@ class Partitura:
     pe_alterado: int | None = None #valor do PE concedido/removido durante a execução dessa partitura
 
     def __post_init__(self):
-        if (tipo == TipoPartitura.ELABORADA):
+        if (self.tipo == TipoPartitura.ELABORADA):
             self.pe_alterado = -self.pe_minimo
 
 @dataclass
