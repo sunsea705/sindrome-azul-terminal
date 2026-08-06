@@ -28,6 +28,14 @@ class ClassificacaoPartitura(Enum):
     def __str__(self):
         return f"[{self.value}]"
 
+class TipoPartitura(Enum):
+    SIMPLES = "SIMPLES"
+    ELABORADA = "ELABORADA"
+
+    def __str__(self):
+        return f"[{self.value}]"
+
+
 class Atributo(Enum):
     TECNICA = "TÉCNICA"
     DETERMINACAO = "DETERMINAÇÃO"
@@ -37,21 +45,28 @@ class Atributo(Enum):
     
 @dataclass
 class Batalha:
-    pontos_de_empolgacao_jogador_atual: int = 0
+    pontos_de_empolgacao_jogador: int = 0
     pontos_de_empolgacao_jogador_max: int = 10
     pontos_de_empolgacao_adversario: int = 0
     pontos_de_empolgacao_adversario_max: int = 10
 
-    def conceder_pe(self, afiliacao, valor_pe):
+    # aceita tantos valores negativos quanto positivos para valor_pe
+    def alterar_pe(self, afiliacao, valor_pe):
         if afiliacao == "J":
-            self.pontos_de_empolgacao_jogador_atual = min(
-                self.pontos_de_empolgacao_jogador_atual + valor_pe,
-                self.pontos_de_empolgacao_jogador_max
+            self.pontos_de_empolgacao_jogador = max(
+                0,
+                min(
+                    self.pontos_de_empolgacao_jogador + valor_pe,
+                    self.pontos_de_empolgacao_jogador_max
+                )
             )
         else:
-            self.pontos_de_empolgacao_adversario = min(
-                self.pontos_de_empolgacao_adversario + valor_pe,
-                self.pontos_de_empolgacao_adversario_max
+            self.pontos_de_empolgacao_adversario = max(
+                0,
+                min(
+                    self.pontos_de_empolgacao_adversario + valor_pe,
+                    self.pontos_de_empolgacao_adversario_max
+                )
             )
             
     def exibir_pe(self):
@@ -71,12 +86,18 @@ class Partitura:
     nome: str
     descricao: str
     classificacao: ClassificacaoPartitura #serve pra diferenciar entre os tipos de partitura (ataque, cura, etc...)
+    tipo: TipoPartitura #identifica se ela é simples ou elaborada
     alcance: int #range, indo de 1-All
     alvos: int #targets, indo de 1-3
-    pe_minimo: int #número mínimo de PEs (Pontos de Empolgação) necessários para executar esta partitura
     modificador: float #modificador usado no cálculo das fórmulas
     bonus: int #bonificador usado para adicionar no valor final da fórmula
     tocar_partitura: callable #função chamada que executa a partitura
+    pe_minimo: int #número mínimo de PEs (Pontos de Empolgação) necessários para executar esta partitura
+    pe_alterado: int | None = None #valor do PE concedido/removido durante a execução dessa partitura
+
+    def __post_init__(self):
+        if (tipo == TipoPartitura.ELABORADA):
+            self.pe_alterado = -self.pe_minimo
 
 @dataclass
 class Personagem:
@@ -184,45 +205,44 @@ def movimentar_personagem(personagem: Personagem, linha: int | None = None, colu
     return True
 
 # O que se entende por ataque básico é a forma mais simples de se efetuar dano, sem efeitos adicionais.
-def ataque_basico(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvo: Personagem):
+def ataque_basico(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvos: list[Personagem]):
+    nomes_alvos = ", ".join(alvo.nome for alvo in alvos)
+    print(f"{atacante.nome} toca [{partitura.nome}] em {nomes_alvos}!")
     tecnica_atacante = atacante.tec
     if (atacante.atributo_buffado == Atributo.TECNICA):
         tecnica_atacante *= atacante.valor_buff
-    dano = max(((tecnica_atacante * partitura.modificador) + partitura.bonus) - alvo.det, 0)
-    if alvo.defendendo: # por padrão reduz em 15% o dano recebido
-        dano *= 0.85
-    if alvo.atributo_buffado == Atributo.DETERMINACAO:
-        dano *= alvo.valor_buff
-    dano = math.floor(dano + 0.5)
-    alvo.pm_atual -= dano
-    print(f"{atacante.nome} toca [{partitura.nome}] em {alvo.nome}!")
-    print(f"{alvo.nome} sofreu {dano} de dano!\n")
-    if alvo.pm_atual <= 0:
-        print(f"{alvo.nome} perdeu toda a sua moral!\n")
-        alvo.pm_atual = 0
-        alvo.status = Status.DERROTADO
-        alvo.defendendo = False
-    batalha_atual.conceder_pe(atacante.afi, 4)
 
-def ataque_basico_elaborado(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvos: list[Personagem]):
-    tecnica_atacante = atacante.tec
-    if (atacante.atributo_buffado == Atributo.TECNICA):
-        tecnica_atacante *= atacante.valor_buff
+    for alvo in alvos:
+        dano = max(((tecnica_atacante * partitura.modificador) + partitura.bonus) - alvo.det, 0)
+        if alvo.defendendo: # por padrão reduz em 15% o dano recebido
+            dano *= 0.85
+        if alvo.atributo_buffado == Atributo.DETERMINACAO:
+            dano *= alvo.valor_buff
+        dano = math.floor(dano + 0.5)
+        alvo.pm_atual -= dano
+        print(f"{alvo.nome} sofreu {dano} de dano!\n")
+        if alvo.pm_atual <= 0:
+            print(f"{alvo.nome} perdeu toda a sua moral!\n")
+            alvo.pm_atual = 0
+            alvo.status = Status.DERROTADO
+            alvo.defendendo = False
+    if (partitura.tipo == TipoPartitura.SIMPLES):
+        batalha_atual.alterar_pe(atacante.afi, +4)
+    else:
+        batalha_atual.alterar_pe(atacante.afi, -partitura.pe_minimo)
+
+# Cura básica é baseada no PM máx. do alvo através dos valores de modificador e bônus da partitura
+def cura_basica(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvos: list[Personagem]):
     nomes_alvos = ", ".join(alvo.nome for alvo in alvos)
     print(f"{atacante.nome} toca [{partitura.nome}] em {nomes_alvos}!")
     for alvo in alvos:
-
-
-# Cura básica é baseada no PM máx. do alvo através dos valores de modificador e bônus da partitura
-def cura_basica(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvo: Personagem):
-    pm_recuperado = round(alvo.pm_max * partitura.modificador) + partitura.bonus
-    alvo.pm_atual = min(alvo.pm_atual + pm_recuperado, alvo.pm_max)
-    print(f"{atacante.nome} toca [{partitura.nome}] em {alvo.nome}!")
-    mensagem_recuperacao_pm = f"{alvo.nome} recuperou {pm_recuperado} PM!"
-    if alvo.pm_atual == alvo.pm_max:
-        mensagem_recuperacao_pm += f" {alvo.nome} teve todo seu PM recuperado!"
-    print(mensagem_recuperacao_pm)
-    batalha_atual.conceder_pe(atacante.afi, 2)
+        pm_recuperado = round(alvo.pm_max * partitura.modificador) + partitura.bonus
+        alvo.pm_atual = min(alvo.pm_atual + pm_recuperado, alvo.pm_max)
+        mensagem_recuperacao_pm = f"{alvo.nome} recuperou {pm_recuperado} PM!"
+        if alvo.pm_atual == alvo.pm_max:
+            mensagem_recuperacao_pm += f" {alvo.nome} teve todo seu PM recuperado!"
+        print(mensagem_recuperacao_pm)
+    batalha_atual.alterar_pe(atacante.afi, +2)
 
 # Função simples e genérica para concender buffs
 def conceder_buff_basico(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvo: Personagem):
@@ -236,12 +256,12 @@ def conceder_buff_basico(batalha_atual: Batalha, partitura: Partitura, atacante:
     alvo.valor_buff = partitura.modificador
     print(f"{atacante.nome} toca [{partitura.nome}] em {alvo.nome}!")
     print(f"{alvo.nome} teve {alvo.atributo_buffado} aumentado pelo resto da rodada!")
-    batalha_atual.conceder_pe(atacante.afi, 2)
+    batalha_atual.alterar_pe(atacante.afi, 2)
  
 def defender(batalha_atual: Batalha, personagem: Personagem):
     personagem.defendendo = True
     personagem.status = Status.DEFENDENDO
-    batalha_atual.conceder_pe(personagem.afi, 2)
+    batalha_atual.alterar_pe(personagem.afi, 2)
     print(f"{personagem.nome} se preparou para defender!\n")
 
 def resetar_status(personagens: list[Personagem]):
@@ -269,36 +289,41 @@ def avancar_rodada(posicao_atual: int, rodada_atual: int, personagens: list[Pers
 partitura_brilha_estrelinha = Partitura(
     nome = "Brilha Brilha, Estrelinha ★",
     descricao = "Uma musiquinha simples amada por Carolina. É um ataque básico.",
-    classificacao = ClassificacaoPartitura.ATAQUE,
-    alcance = 1, alvos = 1, pe_minimo = 0, modificador = 1, bonus = 0,
+    classificacao = ClassificacaoPartitura.ATAQUE, tipo = TipoPartitura.SIMPLES,
+    alcance = 1, alvos = 1, modificador = 1, bonus = 0, 
+    pe_minimo = 0, pe_alterado = 2,
     tocar_partitura = ataque_basico
 )
 partitura_parabens_pra_voce = Partitura(
     nome = "Parabéns Pra Você! 👏",
     descricao = "Você já deve ter ouvido antes perto de um bolo. É um ataque básico.",
-    classificacao = ClassificacaoPartitura.ATAQUE,
-    alcance = 1, alvos = 1, pe_minimo = 0, modificador = 1, bonus = 0,
+    classificacao = ClassificacaoPartitura.ATAQUE, tipo = TipoPartitura.SIMPLES,
+    alcance = 1, alvos = 1, modificador = 1, bonus = 0, 
+    pe_minimo = 0,  pe_alterado = 2,
     tocar_partitura = ataque_basico
 )
 partitura_beijinho_doce = Partitura(
     nome = "Beijinho Doce 💋 ",
     descricao = "Quem não adora um beijinho? Cura uma pequena quantidade de PM do alvo.",
-    classificacao = ClassificacaoPartitura.CURA_PM,
-    alcance = 1, alvos = 1, pe_minimo = 0, modificador = 0.1, bonus = 10,
+    classificacao = ClassificacaoPartitura.CURA_PM, tipo = TipoPartitura.SIMPLES,
+    alcance = 1, alvos = 1, modificador = 0.1, bonus = 10, 
+    pe_minimo = 0, pe_alterado = 2,
     tocar_partitura = cura_basica
 )
 partitura_atencao_basica = Partitura(
     nome = "Atenção Básica! ⚠",
     descricao = "Atenção na contramão! Aumenta levemente a defesa do aliado, reduzindo levemente o dano recebido até o fim da rodada.",
-    classificacao = ClassificacaoPartitura.BUFF_DETERMINACAO,
-    alcance = 1, alvos = 1, pe_minimo = 0, modificador = 0.75, bonus = 0,
+    classificacao = ClassificacaoPartitura.BUFF_DETERMINACAO, tipo = TipoPartitura.SIMPLES,
+    alcance = 1, alvos = 1, modificador = 0.75, bonus = 0, 
+    pe_minimo = 0, pe_alterado = 2,
     tocar_partitura = partitura_basica_conceder_buff
 )
 partitura_musica_da_marcha_azul = Partitura(
     nome = "Marcha da Música Azul 🔵",
     descricao = "Primeiro aperfeiçoamento musical de Carolina. Alcance aumentado e atinge entre 1 a 2 adversários.",
-    classificacao = ClassificacaoPartitura.ATAQUE,
-    alcance = 2, alvos = 2, pe_minimo = 10, modificador = 1, bonus = 4,
+    classificacao = ClassificacaoPartitura.ATAQUE, tipo = TipoPartitura.ELABORADA,
+    alcance = 2, alvos = 2, modificador = 1, bonus = 4,
+    pe_minimo = 10, 
     tocar_paritura = ataque_basico_elaborado
 )
 # Carregando atributos iniciais dos jogadores e adversários
