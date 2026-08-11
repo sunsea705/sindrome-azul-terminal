@@ -71,7 +71,7 @@ class Batalha:
             
     def exibir_pe(self):
         exibicao_pe_jogador = (
-            f"PE: {self.pontos_de_empolgacao_jogador_atual}/"
+            f"PE: {self.pontos_de_empolgacao_jogador}/"
             f"{self.pontos_de_empolgacao_jogador_max}"
         )
         exibicao_pe_adversario = (
@@ -88,7 +88,7 @@ class Partitura:
     classificacao: ClassificacaoPartitura #serve pra diferenciar entre os tipos de partitura (ataque, cura, etc...)
     tipo: TipoPartitura #identifica se ela é simples ou elaborada
     alcance: int #range, indo de 1-All
-    alvos: int #targets, indo de 1-3
+    num_max_alvos: int #targets, indo de 1-3
     modificador: float #modificador usado no cálculo das fórmulas
     bonus: int #bonificador usado para adicionar no valor final da fórmula
     tocar_partitura: callable #função chamada que executa a partitura
@@ -205,7 +205,7 @@ def movimentar_personagem(personagem: Personagem, linha: int | None = None, colu
     return True
 
 # O que se entende por ataque básico é a forma mais simples de se efetuar dano, sem efeitos adicionais.
-def ataque_basico(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvos: list[Personagem]):
+def ataque_basico(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvos: set[Personagem]):
     nomes_alvos = ", ".join(alvo.nome for alvo in alvos)
     print(f"{atacante.nome} toca [{partitura.nome}] em {nomes_alvos}!")
     tecnica_atacante = atacante.tec
@@ -232,7 +232,7 @@ def ataque_basico(batalha_atual: Batalha, partitura: Partitura, atacante: Person
         batalha_atual.alterar_pe(atacante.afi, -partitura.pe_minimo)
 
 # Cura básica é baseada no PM máx. do alvo através dos valores de modificador e bônus da partitura
-def cura_basica(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvos: list[Personagem]):
+def cura_basica(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvos: set[Personagem]):
     nomes_alvos = ", ".join(alvo.nome for alvo in alvos)
     print(f"{atacante.nome} toca [{partitura.nome}] em {nomes_alvos}!")
     for alvo in alvos:
@@ -245,17 +245,18 @@ def cura_basica(batalha_atual: Batalha, partitura: Partitura, atacante: Personag
     batalha_atual.alterar_pe(atacante.afi, +2)
 
 # Função simples e genérica para concender buffs
-def conceder_buff_basico(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvo: Personagem):
-    match partitura.classificacao:
-        case ClassificacaoPartitura.BUFF_TECNICA:
-            alvo.atributo_buffado = Atributo.TECNICA
-        case ClassificacaoPartitura.BUFF_DETERMINACAO:
-            alvo.atributo_buffado = Atributo.DETERMINACAO
-        case _:
-            alvo.atributo_buffado = None
-    alvo.valor_buff = partitura.modificador
+def conceder_buff_basico(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvos: set[Personagem]):
     print(f"{atacante.nome} toca [{partitura.nome}] em {alvo.nome}!")
-    print(f"{alvo.nome} teve {alvo.atributo_buffado} aumentado pelo resto da rodada!")
+    for alvo in alvos:
+        match partitura.classificacao:
+            case ClassificacaoPartitura.BUFF_TECNICA:
+                alvo.atributo_buffado = Atributo.TECNICA
+            case ClassificacaoPartitura.BUFF_DETERMINACAO:
+                alvo.atributo_buffado = Atributo.DETERMINACAO
+            case _:
+                alvo.atributo_buffado = None
+        alvo.valor_buff = partitura.modificador
+        print(f"{alvo.nome} teve {alvo.atributo_buffado} aumentado pelo resto da rodada!")
     batalha_atual.alterar_pe(atacante.afi, 2)
  
 def defender(batalha_atual: Batalha, personagem: Personagem):
@@ -290,7 +291,7 @@ partitura_brilha_estrelinha = Partitura(
     nome = "Brilha Brilha, Estrelinha ★",
     descricao = "Uma musiquinha simples amada por Carolina. É um ataque básico.",
     classificacao = ClassificacaoPartitura.ATAQUE, tipo = TipoPartitura.SIMPLES,
-    alcance = 1, alvos = 1, modificador = 1, bonus = 0, 
+    alcance = 1, num_max_alvos = 1, modificador = 1, bonus = 0, 
     pe_minimo = 0, pe_alterado = 2,
     tocar_partitura = ataque_basico
 )
@@ -298,7 +299,7 @@ partitura_parabens_pra_voce = Partitura(
     nome = "Parabéns Pra Você! 👏",
     descricao = "Você já deve ter ouvido antes perto de um bolo. É um ataque básico.",
     classificacao = ClassificacaoPartitura.ATAQUE, tipo = TipoPartitura.SIMPLES,
-    alcance = 1, alvos = 1, modificador = 1, bonus = 0, 
+    alcance = 1, num_max_alvos = 1, modificador = 1, bonus = 0, 
     pe_minimo = 0,  pe_alterado = 2,
     tocar_partitura = ataque_basico
 )
@@ -306,7 +307,7 @@ partitura_beijinho_doce = Partitura(
     nome = "Beijinho Doce 💋 ",
     descricao = "Quem não adora um beijinho? Cura uma pequena quantidade de PM do alvo.",
     classificacao = ClassificacaoPartitura.CURA_PM, tipo = TipoPartitura.SIMPLES,
-    alcance = 1, alvos = 1, modificador = 0.1, bonus = 10, 
+    alcance = 1, num_max_alvos = 1, modificador = 0.1, bonus = 10, 
     pe_minimo = 0, pe_alterado = 2,
     tocar_partitura = cura_basica
 )
@@ -314,17 +315,17 @@ partitura_atencao_basica = Partitura(
     nome = "Atenção Básica! ⚠",
     descricao = "Atenção na contramão! Aumenta levemente a defesa do aliado, reduzindo levemente o dano recebido até o fim da rodada.",
     classificacao = ClassificacaoPartitura.BUFF_DETERMINACAO, tipo = TipoPartitura.SIMPLES,
-    alcance = 1, alvos = 1, modificador = 0.75, bonus = 0, 
+    alcance = 1, num_max_alvos = 1, modificador = 0.75, bonus = 0, 
     pe_minimo = 0, pe_alterado = 2,
-    tocar_partitura = partitura_basica_conceder_buff
+    tocar_partitura = conceder_buff_basico
 )
 partitura_musica_da_marcha_azul = Partitura(
     nome = "Marcha da Música Azul 🔵",
     descricao = "Primeiro aperfeiçoamento musical de Carolina. Alcance aumentado e atinge entre 1 a 2 adversários.",
     classificacao = ClassificacaoPartitura.ATAQUE, tipo = TipoPartitura.ELABORADA,
-    alcance = 2, alvos = 2, modificador = 1, bonus = 4,
+    alcance = 2, num_max_alvos = 2, modificador = 1, bonus = 4,
     pe_minimo = 10, 
-    tocar_paritura = ataque_basico_elaborado
+    tocar_partitura = ataque_basico
 )
 # Carregando atributos iniciais dos jogadores e adversários
 jogador1 = Personagem(
@@ -449,26 +450,51 @@ while True:
                         break
                 # Escolha do alvo
                 while True:
-                    lista_alvos = None
-                    alvo_escolhido = None
-                    print("Escolha o alvo:")
+                    lista_possiveis_alvos = None
                     match partitura_escolhida.classificacao:
                         case ClassificacaoPartitura.ATAQUE | ClassificacaoPartitura.DEBUFF_TECNICA | ClassificacaoPartitura.DEBUFF_DETERMINACAO:
-                            lista_alvos = adversarios
+                            lista_possiveis_alvos = adversarios
                         case ClassificacaoPartitura.CURA_PM | ClassificacaoPartitura.BUFF_TECNICA | ClassificacaoPartitura.BUFF_DETERMINACAO:
-                            lista_alvos = jogadores
-                    for i, alvo in enumerate(lista_alvos):
-                        if alvo.derrotado:
-                            continue
-                        print(f"{i + 1}. ({alvo.nome_abr}) {alvo.nome}")
-                    indice_alvo = int(input(">> "))
-                    if indice_alvo < 1 or indice_alvo > len(lista_alvos):
-                        print("Mas esse alvo não existe...")
+                            lista_possiveis_alvos = jogadores
+
+                    # Removendo derrotados da lista
+                    lista_alvos = list(
+                        filter(lambda p: p.status != Status.DERROTADO, lista_possiveis_alvos)
+                    )
+                    if (partitura_escolhida.num_max_alvos == 1):
+                        print("Escolha o alvo:")
                     else:
-                        alvo_escolhido = lista_alvos[indice_alvo - 1]
-                        partitura_escolhida.tocar_partitura(batalha_atual, partitura_escolhida, personagem_atual, alvo_escolhido)
-                        acao_realizada = True
-                        break
+                        print(f"Escolha entre 1-{partitura_escolhida.num_max_alvos} alvos (t para todos):")
+
+                    indices_alvos_escolhidos = set()
+                    while len(indices_alvos_escolhidos) <= partitura_escolhida.num_max_alvos:
+                        for i, alvo in enumerate(lista_alvos):
+                            alvo_esta_selecionado = "[SELECIONADO]" if i in indices_alvos_escolhidos else ""
+                            print(f"{i + 1}. ({alvo.nome_abr}) {alvo.nome} {alvo_esta_selecionado}")
+                        print(f"Alvos escolhidos: {", ".join(alvo.nome for alvo in alvos)}")
+                        indice_alvo = input(">> (Aperte enter para concluir) ")
+                        if indice_alvo == "" and len(indices_alvos_escolhidos) == 0:
+                            print("Mas tem que escolher ao menos 1 alvo...")
+                            continue
+                        if indice_alvo == "t":
+                            quantidade_possiveis_alvos = min(
+                                partitura_escolhida.num_max_alvos,
+                                len(lista_alvos)
+                            )
+                            indices_alvos_escolhidos = set(range(quantidade_possiveis_alvos))
+                            break
+                        if int(indice_alvo) < 1 or int(indice_alvo) > len(lista_alvos):
+                            print("Mas esse alvo não existe...")
+                            continue
+                    
+                        indices_alvos_escolhidos.add(indice_alvo - 1)
+
+                    alvos_escolhidos = list()
+                    for indice_alvo_escolhido in indices_alvos_escolhidos:
+                        alvos_escolhidos.append(lista_alvos[indice_alvo_escolhido])
+                    partitura_escolhida.tocar_partitura(batalha_atual, partitura_escolhida, personagem_atual, alvos_escolhidos)
+                    acao_realizada = True
+                    break
         
             elif (comando_selecionado == 'd'):
                 defender(batalha_atual, personagem_atual)
