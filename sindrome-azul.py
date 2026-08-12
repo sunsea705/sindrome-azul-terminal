@@ -227,7 +227,7 @@ def ataque_basico(batalha_atual: Batalha, partitura: Partitura, atacante: Person
             alvo.status = Status.DERROTADO
             alvo.defendendo = False
     if (partitura.tipo == TipoPartitura.SIMPLES):
-        batalha_atual.alterar_pe(atacante.afi, +4)
+        batalha_atual.alterar_pe(atacante.afi, +partitura.pe_alterado)
     else:
         batalha_atual.alterar_pe(atacante.afi, -partitura.pe_minimo)
 
@@ -242,7 +242,7 @@ def cura_basica(batalha_atual: Batalha, partitura: Partitura, atacante: Personag
         if alvo.pm_atual == alvo.pm_max:
             mensagem_recuperacao_pm += f" {alvo.nome} teve todo seu PM recuperado!"
         print(mensagem_recuperacao_pm)
-    batalha_atual.alterar_pe(atacante.afi, +2)
+    batalha_atual.alterar_pe(atacante.afi, +partitura.pe_alterado)
 
 # Função simples e genérica para concender buffs
 def conceder_buff_basico(batalha_atual: Batalha, partitura: Partitura, atacante: Personagem, alvos: set[Personagem]):
@@ -257,7 +257,7 @@ def conceder_buff_basico(batalha_atual: Batalha, partitura: Partitura, atacante:
                 alvo.atributo_buffado = None
         alvo.valor_buff = partitura.modificador
         print(f"{alvo.nome} teve {alvo.atributo_buffado} aumentado pelo resto da rodada!")
-    batalha_atual.alterar_pe(atacante.afi, 2)
+    batalha_atual.alterar_pe(atacante.afi, +partitura.pe_alterado)
  
 def defender(batalha_atual: Batalha, personagem: Personagem):
     personagem.defendendo = True
@@ -471,7 +471,6 @@ while True:
                         for i, alvo in enumerate(lista_alvos):
                             alvo_esta_selecionado = "[SELECIONADO]" if i in indices_alvos_escolhidos else ""
                             print(f"{i + 1}. ({alvo.nome_abr}) {alvo.nome} {alvo_esta_selecionado}")
-                        print(f"Alvos escolhidos: {", ".join(alvo.nome for alvo in alvos)}")
                         indice_alvo = input(">> (Aperte enter para concluir) ")
                         if indice_alvo == "" and len(indices_alvos_escolhidos) == 0:
                             print("Mas tem que escolher ao menos 1 alvo...")
@@ -522,7 +521,7 @@ while True:
                     break
                 elif (acao_adversario_escolhida == 't'):
                     partitura_escolhida = random.choice(personagem_atual.partituras_equipadas)
-                    partitura_escolhida.tocar_partitura(batalha_atual, partitura_escolhida, personagem_atual, random.choice(jogadores))
+                    partitura_escolhida.tocar_partitura(batalha_atual, partitura_escolhida, personagem_atual, set(random.choice(jogadores)))
 
                     break
                 elif (acao_adversario_escolhida == 'd'):
